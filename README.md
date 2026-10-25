@@ -1,4 +1,4 @@
-# QQ 私聊接入 Codex（Linux 精简版）
+# QQ 私聊接入 Codex（Linux 版）
 
 基于 [Epic0522/Codex-Remote-Contact](https://github.com/Epic0522/Codex-Remote-Contact) 的 OneBot 私聊接入思路精简重写。只保留 QQ 私信 → 本机 Codex CLI → QQ 回复；不需要群、@、iMessage、macOS 或网页控制台。文件输出模式使用 undici 转发模型请求；文档依赖安装在项目专用 Python 环境。
 
@@ -57,15 +57,6 @@ Codex 生成失败会记录错误并尝试发送一条固定提示；QQ 发送�
 
 上游 Git 历史保留，便于追溯；精简版不再使用上游的 Mac 脚本、可选增强模块或旧配置格式。
 
-## 本机已配置部署
-
-- QQ：`3042803008`；NapCat `v4.18.41` / Linux QQ `3.2.34-53644`。
-- 桥接器安装在 `/home/yili/.local/share/codex-qq-bridge`，无需 sudo。
-- 本机 3000 端口已占用，本部署 OneBot API 使用 `127.0.0.1:3001`。
-- WebUI：`http://127.0.0.1:6099/webui/`。登录密钥保存在安装目录的 `napcat/config/webui.json`，不要公开。
-- 项目 `.env` 和桥接器配置含随机鉴权密钥，权限为 600，不提交 Git。
-- 当前以用户 systemd 服务运行，未启用开机自启。NapCat 不配置自动重启，避免故障时反复登录。
-
 ```bash
 # 查看状态
 systemctl --user status codex-qq-private.service napcat-qq.service
@@ -94,15 +85,15 @@ journalctl --user -u codex-qq-private.service -f
 
 ## 自己给自己发消息
 
-当前绑定账号为 `3042803008`（昵称“巧克LY”）；程序依据 QQ 号码判断身份，不依据可修改的昵称。
+程序依据 QQ 号码判断身份，不依据可修改的昵称。
 
 NapCat 的 HTTP 客户端已开启 `reportSelfMessage`。服务仅接受 `user_id = self_id = target_id = QQ_ACCOUNT` 的自聊事件，你发给别人的消息仍被忽略。自聊的 AI 回复每个分段都加 `[Codex] ` 前缀，带该前缀的自聊消息不再触发模型，避免即时或延迟回显、重启后的循环。你自己的提问不要以 `[Codex]` 开头。
 
-自聊与其他联系人一样，受发送间隔、联系人限额和故障暂停保护。自聊记录保存在 `data/conversations/3042803008-3042803008.json`。
+自聊与其他联系人一样，受发送间隔、联系人限额和故障暂停保护。
 
 ## 调整回复风格
 
-直接编辑项目根目录的 `style.md`（本机路径 `/home/yili/Codex-Remote-Contact/style.md`），写明语气、长短、格式、emoji 等偏好。服务在每次开始生成回复时重新读取文件，保存后的下一次生成生效，不需要重启；已经开始生成的回复不受本次修改影响。所有联系人和自聊共用此风格。
+直接编辑项目根目录的 `style.md`（本机路径 ），写明语气、长短、格式、emoji 等偏好。服务在每次开始生成回复时重新读取文件，保存后的下一次生成生效，不需要重启；已经开始生成的回复不受本次修改影响。所有联系人和自聊共用此风格。
 
 文件留空或删除时使用基础提示词；其他读取错误会按生成失败处理并记录日志。风格只影响模型表达，不改变账号身份说明、发送频率限制、自聊防回环或故障暂停。历史回复仍会作为上下文保留；需要完全重新开始时，可在对应私聊发送 `/清除记忆`。
 
@@ -129,7 +120,7 @@ journalctl --user -u codex-qq-private.service -f
 
 ## QQ 内置表情
 
-现在可以发送真正的 OneBot `face` 消息段，与文字混排或单独成为气泡。支持：微笑、害羞、大哭、流泪、呲牙、惊讶、偷笑、可爱、奋斗、疑问、鼓掌、笑哭、捂脸、爱心、赞、OK、抱拳、握手。名称和 ID 来自本机 NapCat v4.18.41 的 sysface 表。
+可以发送的 OneBot `face` 消息段，与文字混排或单独成为气泡。支持：微笑、害羞、大哭、流泪、呲牙、惊讶、偷笑、可爱、奋斗、疑问、鼓掌、笑哭、捂脸、爱心、赞、OK、抱拳、握手。名称和 ID 来自本机 NapCat v4.18.41 的 sysface 表。
 
 继续在 `style.md` 中写“适当使用 QQ 内置表情”即可，系统提示会自动告诉模型使用 `[[QQ_FACE:表情名]]`，例如 `哈哈[[QQ_FACE:呲牙]]` 会发送文字“哈哈”及真正的呲牙表情。未知表情名保留为普通文字，不向桥接器发送无效 ID。普通 `[微笑]`、CQ 码和代码围栏/行内代码示例不会自动转为表情。
 
@@ -150,7 +141,7 @@ journalctl --user -u codex-qq-private.service -f
 实现文件：`src/attachments.js` 管理附件生命周期，`scripts/read_attachment.py` 提取文本和处理图片，`src/server.js` 负责静默接收与将附件传给模型，`test/attachments.test.js` 验证链路。本机系统依赖为 `/usr/bin/python3`、Python Pillow、`/usr/bin/pdftotext`；Ubuntu 对应包为 `python3`、`python3-pil`、`poppler-utils`，当前机器已具备，无新增 npm 依赖。
 
 
-## 原生文件输出（无需 sudo）
+## 原生文件输出
 
 流程是 **QQ → NapCat → 原生 Codex CLI → GPT 自主调用工具生成、检查文件 → NapCat 发回 QQ**。项目没有固定文档生成器，也不要求 GPT 返回生成脚本的 JSON；模型在同一轮原生工具调用中编写代码、执行、重新打开文件，并按需要修正。
 
@@ -182,14 +173,12 @@ data/outputs/<登录QQ>-<联系人QQ>/<任务ID>/
 
 `src/outputs.js` 只负责输入副本、成品收集、自聊回传识别与清理；`src/server.js` 负责消息队列和 NapCat `upload_private_file`。没有固定 Word/Excel/PDF 生成脚本。
 
-## 每日 QQ 离线时段
+## 每日唤醒时段
 
-本机使用用户级 systemd 定时器 `qq-online-schedule.timer`：每天 **北京时间 01:00 停止 NapCat/QQ，07:00 启动**。不注销账号、不删除登录数据，也不会反复尝试登录。启动条件会阻止在 01:00–07:00 通过此 QQ 服务手动启动。机器错过定时时刻时，用户级 systemd 恢复后会按当前北京时间重新决定启停，不会机械补执行过期动作；机器关机/休眠期间不能保证 07:00 准时启动。
+本机使用用户级 systemd 定时器 `qq-online-schedule.timer`：每天 **北京时间 01:00 停止 NapCat/QQ，07:00 启动**。启动条件会阻止在 01:00–07:00 通过此 QQ 服务手动启动。机器错过定时时刻时，用户级 systemd 恢复后会按当前北京时间重新决定启停，不会机械补执行过期动作；机器关机/休眠期间不能保证 07:00 准时启动。
 
 `.env` 中 `QQ_NIGHT_OFFLINE=1` 同时抑制夜间消息处理及文字/文件发送，计划下线期间未完成的回复不自动补发。私聊服务本身继续运行；计划断开造成的发送中断不写入故障暂停标记。此设置不清除此前已有的故障暂停状态。
 
 定时器配置模板在 `config/systemd/`，执行脚本为 `scripts/qq-schedule.mjs`，统一时段判断在 `src/quiet-hours.js`。本机安装在 `~/.config/systemd/user/`，NapCat 的启动条件安装在 `napcat-qq.service.d/night-hours.conf`。模板中的路径需在其他机器部署时调整。
 
 查看状态：`systemctl --user list-timers qq-online-schedule.timer`。取消计划需同时停用定时器、删除该启动条件 drop-in，并将 `.env` 的 `QQ_NIGHT_OFFLINE` 改为 `0`，再重新加载 systemd 和重启私聊服务。
-
-07:00 启动客户端不等于保证登录成功。QQ 已踢下线或登录凭据失效时，仍可能要求扫码；定时离线不能保证避免腾讯账号风控。
