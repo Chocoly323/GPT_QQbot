@@ -70,9 +70,7 @@ journalctl --user -u codex-qq-private.service -f
 首次登录需手机 QQ 扫码确认。遇到账号异常，请及时停止接入，避免账号风控。
 
 
-## 发送频率与故障暂停
-
-以下是本项目的保守流量设置，但不能完全保证账号不受风控影响：
+## 防账号风控设置
 
 - `SEND_INTERVAL_MS=3000`：所有真实 QQ 发信请求之间至少间隔 3 秒，包括长回复各分段和错误提示。
 - `CONTACT_WINDOW_MS=600000`、`CONTACT_MAX_REPLIES=10`：同一联系人每 10 分钟最多接收 10 个回复任务（包括清除记忆和生成失败）。超过限额的消息直接忽略。不同联系人分别计数；限额计数存于内存，重启重置。
@@ -95,18 +93,6 @@ NapCat 的 HTTP 客户端已开启 `reportSelfMessage`。服务仅接受 `user_i
 
 文件留空或删除时使用基础提示词；其他读取错误会按生成失败处理并记录日志。需要完全重新开始时，可在对应私聊发送 `/清除记忆`。
 
-## 回复耗时
-
-QQ 服务通过 Codex 的 JSON 事件读取最终回答；收到 `turn.completed` 后即可发信。子进程继续排空输出，退出后清理临时目录；清理异常拖延时会终止子进程。
-
-基础文字模式单独关闭 Codex 的 memories、plugins、apps、shell_tool；原生文件模式保留 shell 工具，允许模型按需生成并检查文件，并限制技能目录提示的 token 预算，以减少与文字聊天无关的上下文。
-
-服务日志中的 `reply_timing` 提供 `queueMs`（排队及准备）、`generationMs`（生成）、`sendMs`（发送及限频等待）、`totalMs`，不记录消息正文。失败或跳过的任务可能只包含部分耗时字段。任务串行，其他人的长任务可能造成等待。
-
-```bash
-journalctl --user -u codex-qq-private.service -f
-```
-
 ## 多气泡回复
 
 `style.md` 可以要求按内容分成多个气泡。系统提示会要求模型在气泡之间用独占一行的 `[[QQ_BUBBLE]]` 分隔，发送程序移除分隔符并依次发送。
@@ -119,12 +105,12 @@ journalctl --user -u codex-qq-private.service -f
 
 ## 图片与文档附件
 
-直接在 QQ 私聊（含给自己发消息）发送 JPG/JPEG、PNG、WebP 图片，或 DOCX、PDF、TXT、MD、XLSX、CSV 文件。发送附件时静默保存，**不会立马调用模型分析**；接收失败会提示；不再需要时发送 `/清除附件`。`/清除记忆` 只清聊天记录，不清附件。
+直接在 QQ 私聊（含给自己发消息）发送 JPG/JPEG、PNG、WebP 图片，或 DOCX、PDF、TXT、MD、XLSX、CSV 文件。接收失败会提示；不再需要时发送 `/清除附件`。`/清除记忆` 只清聊天记录，不清附件。
 
 - 单文件 20 MiB；每个联系人最多保留 10 个附件，整个服务最多 100 个，每条消息最多接收 10 个。
 - 文件存放于 `data/attachments/<登录QQ>-<联系人QQ>/<随机ID>/`。
-- 保留 24 小时；每分钟排队清理一次，正在分析时会等本次任务结束。清理范围是本项目附件副本，**不包含 QQ 自身缓存、对话历史及已发送给模型的数据**。
-- 接收通过本机 NapCat 获取缓存文件，只允许 QQ 数据目录和桥接器安装目录中的普通文件。
+- 保留 24 小时；每分钟排队清理一次，正在分析时会等本次任务结束。
+- 接收通过本机 NapCat 获取缓存文件。
 - 图片使用 Pillow 解码并缩小至最长边 2048 像素后传入 Codex 。DOCX 提取正文和表格文字；XLSX 提取各表的单元格位置、缓存值及公式。TXT/MD/CSV 支持 UTF-8 与 GB18030。
 - PDF 提取前 200 页文字。每份文档及每次分析的附件文字最多 60000 字符。
 
@@ -153,7 +139,7 @@ data/outputs/<登录QQ>-<联系人QQ>/<任务ID>/
 - `NATIVE_FILES=1` 开启；`NATIVE_TIMEOUT_MS=300000` 设置单轮最大 5 分钟。关闭后恢复基础文字模式。
 - `.venv-files/` 是文档运行环境，模型自行调用其中的 Python。依赖锁定于 `requirements-output.txt`：python-docx、openpyxl、reportlab、Pillow 等。系统提供 pdftotext、pdftoppm 和 `/usr/share/fonts/truetype/arphic/uming.ttc` 中文字体。
 - 重建环境：`/usr/bin/python3 -m venv --without-pip .venv-files`，再用可用 pip 执行 `python3 -m pip --python .venv-files/bin/python install -r requirements-output.txt`；Node 依赖执行 `npm ci`。
-- `CODEX_PROXY_URL` 指定沙箱外模型代理使用的上游 HTTP 代理；当前本机默认 `http://127.0.0.1:17897`。模型与思考强度仍使用 `.env` 中的配置。
+- `CODEX_PROXY_URL` 指定沙箱外模型代理使用的上游 HTTP 代理；当前本机默认 `http://127.0.0.1:17897`。模型与思考强度使用 `.env` 中的配置。
 
 `src/native-runtime.js` 在沙箱外读取本机 Codex 登录凭据，每次请求重新读取登录凭据；若凭据失效，需通过正常 Codex 登录恢复。
 
